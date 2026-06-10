@@ -14,10 +14,10 @@ export async function sendOTP(phone) {
       throw new Error('API_URL is not configured. Check your .env file.')
     }
 
-    const response = await fetch(`${API_URL}/auth/send-otp`, {
+    const response = await fetch(`${API_URL}/auth/mobile/send-otp`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ phone, userType: 'customer' })
+      body:    JSON.stringify({ phone })
     })
     
     console.log('Response status:', response.status)
@@ -39,10 +39,10 @@ export async function verifyOTP(phone, otp) {
     console.log('📞 Phone:', phone)
     console.log('🔢 OTP:', otp)
     
-    const response = await fetch(`${API_URL}/auth/verify-otp`, {
+    const response = await fetch(`${API_URL}/auth/mobile/verify-otp`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ phone, otp, userType: 'customer' })
+      body:    JSON.stringify({ phone, otp })
     })
     
     console.log('📨 Response status:', response.status)
@@ -50,12 +50,23 @@ export async function verifyOTP(phone, otp) {
     const data = await response.json()
     console.log('📨 Response data:', data)
     
-    if (!response.ok) throw new Error(data.error || 'Invalid OTP')
+    if (!response.ok) throw new Error(data.message || data.error || 'Invalid OTP')
+    
+    // Extract access token from response (backend returns tokens object)
+    const accessToken = data.tokens?.access_token || data.token
+    const user = data.user
+    const isNew = data.isNewUser || false
+    
+    if (!accessToken) {
+      throw new Error('No access token received from server')
+    }
+    
+    console.log('✅ Token received from backend')
     
     // Save token to AsyncStorage
     console.log('💾 Saving token to AsyncStorage...')
-    await AsyncStorage.setItem('auth_token', data.token)
-    await AsyncStorage.setItem('user_data', JSON.stringify(data.user))
+    await AsyncStorage.setItem('auth_token', accessToken)
+    await AsyncStorage.setItem('user_data', JSON.stringify(user))
     
     // Also save to web localStorage if available (web compatibility)
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -63,8 +74,8 @@ export async function verifyOTP(phone, otp) {
         console.log('💾 Also saving to localStorage (web)...')
         const authData = {
           state: {
-            user: data.user,
-            token: data.token
+            user: user,
+            token: accessToken
           },
           version: 0
         }
@@ -82,7 +93,7 @@ export async function verifyOTP(phone, otp) {
       console.error('❌ Token was NOT saved to AsyncStorage!')
     }
     
-    return { success: true, token: data.token, user: data.user, isNew: data.isNew }
+    return { success: true, token: accessToken, user: user, isNew: isNew }
   } catch (error) {
     console.error('💥 verifyOTP error:', error)
     return { success: false, error: error.message }
