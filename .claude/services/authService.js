@@ -54,10 +54,23 @@ export async function getToken() {
   return await AsyncStorage.getItem('auth_token')
 }
 
-// Logout
+// Logout - Clear all local data
 export async function logout() {
-  await AsyncStorage.removeItem('auth_token')
-  await AsyncStorage.removeItem('user_data')
+  try {
+    // Clear authentication data
+    await AsyncStorage.removeItem('auth_token')
+    await AsyncStorage.removeItem('user_data')
+    
+    // Clear cart data
+    await AsyncStorage.removeItem('cart-storage')
+    
+    console.log('Logout successful - all data cleared')
+    return { success: true }
+  } catch (error) {
+    console.error('Logout error:', error)
+    // Still return success as we want to logout even if clearing fails
+    return { success: true }
+  }
 }
 
 // Check if user is logged in

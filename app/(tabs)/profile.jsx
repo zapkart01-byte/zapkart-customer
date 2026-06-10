@@ -30,9 +30,21 @@ export default function ProfileScreen() {
           text: 'Logout',
           style: 'destructive',
           onPress: async () => {
-            await authLogout()
-            clearUser()
-            router.replace('/(auth)/welcome')
+            try {
+              // Clear auth token and user data
+              await authLogout()
+              
+              // Clear zustand store
+              clearUser()
+              
+              // Navigate to welcome screen
+              router.replace('/(auth)/welcome')
+            } catch (error) {
+              console.error('Logout error:', error)
+              // Still clear and navigate even if error occurs
+              clearUser()
+              router.replace('/(auth)/welcome')
+            }
           }
         }
       ]
