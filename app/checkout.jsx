@@ -142,9 +142,17 @@ export default function CheckoutScreen() {
           </View>
         </View>
 
-        {/* Delivery Address */}
+        {/* Delivery Address - REQUIRED */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Delivery Address</Text>
+          <Text style={styles.sectionTitle}>Delivery Address *</Text>
+          {!isFormValid() && (
+            <View style={styles.warningBox}>
+              <Text style={styles.warningIcon}>⚠️</Text>
+              <Text style={styles.warningText}>
+                Fill address (min 10 chars) and phone (10 digits) to enable order button
+              </Text>
+            </View>
+          )}
           <View style={styles.card}>
             <TextInput
               style={styles.textInput}
@@ -307,6 +315,11 @@ const styles = StyleSheet.create({
   billValue:                { fontSize: 14, color: '#0D0D0D' },
   billLabelBold:            { fontSize: 16, fontWeight: '700', color: '#0D0D0D' },
   billValueBold:            { fontSize: 16, fontWeight: '700', color: '#0D0D0D' },
+  warningBox:               { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF7ED',
+                              padding: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1,
+                              borderColor: '#FFEDD5' },
+  warningIcon:              { fontSize: 18, marginRight: 8 },
+  warningText:              { flex: 1, fontSize: 12, color: '#9A3412', lineHeight: 16 },
   footer:                   { position: 'absolute', bottom: 0, left: 0, right: 0,
                               flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                               backgroundColor: '#FFFFFF', padding: 16, paddingBottom: 32,
