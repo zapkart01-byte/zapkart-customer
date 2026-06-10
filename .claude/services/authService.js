@@ -55,10 +55,28 @@ export async function verifyOTP(phone, otp) {
     // Save token to AsyncStorage
     console.log('💾 Saving token to AsyncStorage...')
     await AsyncStorage.setItem('auth_token', data.token)
+    await AsyncStorage.setItem('user_data', JSON.stringify(data.user))
+    
+    // Also save to web localStorage if available (web compatibility)
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        console.log('💾 Also saving to localStorage (web)...')
+        const authData = {
+          state: {
+            user: data.user,
+            token: data.token
+          },
+          version: 0
+        }
+        window.localStorage.setItem('auth-storage', JSON.stringify(authData))
+      } catch (webError) {
+        console.error('⚠️ localStorage save failed:', webError.message)
+      }
+    }
     
     // Verify it was saved
     const savedToken = await AsyncStorage.getItem('auth_token')
-    console.log('✅ Token saved:', savedToken ? 'YES' : 'NO')
+    console.log('✅ Token saved to AsyncStorage:', savedToken ? 'YES' : 'NO')
     
     if (!savedToken) {
       console.error('❌ Token was NOT saved to AsyncStorage!')
@@ -71,36 +89,58 @@ export async function verifyOTP(phone, otp) {
   }
 }
 
-// Get stored auth token
+// Get stored auth token with platform-specific fallbacks
 export async function getToken() {
   try {
     console.log('📖 getToken called')
     
-    // Try AsyncStorage first
-    const token = await AsyncStorage.getItem('auth_token')
-    console.log('🔑 Token from AsyncStorage:', token ? `${token.substring(0, 30)}...` : 'NULL')
+    // Strategy 1: Try AsyncStorage (works on native)
+    const asyncToken = await AsyncStorage.getItem('auth_token')
+    console.log('🔑 AsyncStorage token:', asyncToken ? `${asyncToken.substring(0, 30)}...` : 'NULL')
     
-    if (token) {
-      return token
+    if (asyncToken) {
+      return asyncToken
     }
     
-    // Fallback: Try to get from authStore (for web compatibility)
+    // Strategy 2: Try Zustand store (persists better on web)
     try {
-      const { default: useAuthStore } = await import('../store/authStore')
+      // Direct import works better than dynamic import
+      const useAuthStore = require('../store/authStore').default
       const storeToken = useAuthStore.getState().token
-      console.log('🔑 Token from authStore:', storeToken ? `${storeToken.substring(0, 30)}...` : 'NULL')
+      console.log('🔑 Zustand store token:', storeToken ? `${storeToken.substring(0, 30)}...` : 'NULL')
       
       if (storeToken) {
-        // Save back to AsyncStorage for next time
+        // Sync back to AsyncStorage for next time
         await AsyncStorage.setItem('auth_token', storeToken)
         return storeToken
       }
     } catch (storeError) {
-      console.error('⚠️ Could not access authStore:', storeError.message)
+      console.error('⚠️ Could not access Zustand store:', storeError.message)
     }
     
-    console.warn('⚠️ No token found anywhere!')
-    console.warn('⚠️ User needs to login')
+    // Strategy 3: Web-specific localStorage fallback
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const authStorage = window.localStorage.getItem('auth-storage')
+        if (authStorage) {
+          const parsed = JSON.parse(authStorage)
+          const webToken = parsed?.state?.token
+          console.log('🔑 localStorage token:', webToken ? `${webToken.substring(0, 30)}...` : 'NULL')
+          
+          if (webToken) {
+            // Sync to AsyncStorage
+            await AsyncStorage.setItem('auth_token', webToken)
+            return webToken
+          }
+        }
+      } catch (webError) {
+        console.error('⚠️ localStorage parse error:', webError.message)
+      }
+    }
+    
+    console.warn('❌ NO TOKEN FOUND IN ANY STORAGE!')
+    console.warn('⚠️ User must login again')
+    console.warn('💡 TIP: If on web, try testing on native app (Expo Go)')
     return null
     
   } catch (error) {
@@ -109,20 +149,44 @@ export async function getToken() {
   }
 }
 
-// Logout - Clear all local data
+// Logout - Clear all local data across all storage mechanisms
 export async function logout() {
   try {
-    // Clear authentication data
+    console.log('🚪 Logout called')
+    
+    // Clear AsyncStorage
     await AsyncStorage.removeItem('auth_token')
     await AsyncStorage.removeItem('user_data')
-    
-    // Clear cart data
     await AsyncStorage.removeItem('cart-storage')
+    await AsyncStorage.removeItem('auth-storage')
+    console.log('✅ AsyncStorage cleared')
     
-    console.log('Logout successful - all data cleared')
+    // Clear web localStorage if available
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.removeItem('auth-storage')
+        window.localStorage.removeItem('auth_token')
+        window.localStorage.removeItem('user_data')
+        window.localStorage.removeItem('cart-storage')
+        console.log('✅ localStorage cleared')
+      } catch (webError) {
+        console.error('⚠️ localStorage clear failed:', webError.message)
+      }
+    }
+    
+    // Clear Zustand store
+    try {
+      const useAuthStore = require('../store/authStore').default
+      useAuthStore.getState().clearUser()
+      console.log('✅ Zustand store cleared')
+    } catch (storeError) {
+      console.error('⚠️ Zustand clear failed:', storeError.message)
+    }
+    
+    console.log('✅ Logout successful - all data cleared')
     return { success: true }
   } catch (error) {
-    console.error('Logout error:', error)
+    console.error('💥 Logout error:', error)
     // Still return success as we want to logout even if clearing fails
     return { success: true }
   }
