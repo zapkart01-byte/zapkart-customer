@@ -37,6 +37,8 @@ export default function CheckoutScreen() {
   }
 
   const handlePlaceOrder = async () => {
+    console.log('Place Order clicked')
+    
     if (!isFormValid()) {
       Alert.alert('Missing Information', 'Please provide complete delivery address and phone number')
       return
@@ -47,45 +49,70 @@ export default function CheckoutScreen() {
       return
     }
 
-    setLoading(true)
-
-    // Prepare order data
-    const orderData = {
-      storeId: storeId,
-      distanceKm: 5, // Default distance - in real app would use GPS/maps
-      items: items.map(item => ({
-        productId: item.id,
-        quantity: item.quantity
-      })),
-      deliveryAddress: {
-        fullAddress: fullAddress.trim(),
-        landmark: landmark.trim(),
-        phone: phone.trim()
-      },
-      payment_method: paymentMethod,
-      couponCode: couponCode.trim() || undefined
-    }
-
-    const { data, error } = await placeOrder(orderData)
-    setLoading(false)
-
-    if (error) {
-      Alert.alert('Order Failed', error)
+    if (!storeId) {
+      Alert.alert('Error', 'Store ID not found. Please add items to cart again.')
       return
     }
 
-    // Success!
-    clearCart()
-    Alert.alert(
-      'Order Placed! 🎉',
-      `Your order #${data.order.id.slice(0, 8)} has been placed successfully. You can track it from Orders tab.`,
-      [
-        {
-          text: 'View Orders',
-          onPress: () => router.replace('/(tabs)/orders')
-        }
-      ]
-    )
+    setLoading(true)
+
+    try {
+      // Prepare order data
+      const orderData = {
+        storeId: storeId,
+        distanceKm: 5, // Default distance - in real app would use GPS/maps
+        items: items.map(item => ({
+          productId: item.id,
+          quantity: item.quantity
+        })),
+        deliveryAddress: {
+          fullAddress: fullAddress.trim(),
+          landmark: landmark.trim(),
+          phone: phone.trim()
+        },
+        payment_method: paymentMethod,
+        couponCode: couponCode.trim() || undefined
+      }
+
+      console.log('Placing order with data:', JSON.stringify(orderData, null, 2))
+
+      const { data, error } = await placeOrder(orderData)
+      
+      console.log('Order response:', { data, error })
+      
+      setLoading(false)
+
+      if (error) {
+        console.error('Order error:', error)
+        Alert.alert('Order Failed', error)
+        return
+      }
+
+      if (!data || !data.order) {
+        console.error('Invalid response from server:', data)
+        Alert.alert('Order Failed', 'Invalid response from server. Please try again.')
+        return
+      }
+
+      // Success!
+      console.log('Order placed successfully:', data.order.id)
+      clearCart()
+      
+      Alert.alert(
+        'Order Placed! 🎉',
+        `Your order #${data.order.id.slice(0, 8)} has been placed successfully. You can track it from Orders tab.`,
+        [
+          {
+            text: 'View Orders',
+            onPress: () => router.replace('/(tabs)/orders')
+          }
+        ]
+      )
+    } catch (err) {
+      console.error('Unexpected error placing order:', err)
+      setLoading(false)
+      Alert.alert('Error', 'An unexpected error occurred. Please check your internet connection and try again.')
+    }
   }
 
   if (items.length === 0) {
