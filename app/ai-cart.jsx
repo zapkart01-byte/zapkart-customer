@@ -1,11 +1,10 @@
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, ActivityIndicator
+  StyleSheet, Alert, ActivityIndicator, Image
 } from 'react-native'
 import { useState } from 'react'
 import { router } from 'expo-router'
-import * as ImagePicker from 'expo-image-picker'
-import { parseTextList, parseImageList } from '../.claude/services/aiCartService'
+import { parseTextList, parseImageList } from '../services/aiCartService'
 import useCartStore from '../store/cartStore'
 
 export default function AICartScreen() {
@@ -13,7 +12,7 @@ export default function AICartScreen() {
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState(null)
   const [selectedItems, setSelectedItems] = useState([])
-  const { addItem } = useCartStore()
+  const { items: cartItems, storeId: cartStoreId, clearCart, addItem } = useCartStore()
 
   const exampleChips = [
     '2L milk, 6 eggs, bread',
@@ -55,6 +54,18 @@ export default function AICartScreen() {
     if (!result.canceled && result.assets[0].base64) {
       processImage(result.assets[0].base64)
     }
+  }
+
+  const handlePhotoPress = () => {
+    Alert.alert(
+      'Select Image Source',
+      'Choose how you want to upload your receipt/list photo',
+      [
+        { text: 'Take Photo', onPress: handleCamera },
+        { text: 'Choose from Gallery', onPress: handleGallery },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    )
   }
 
   const processImage = async (base64) => {
@@ -119,14 +130,37 @@ export default function AICartScreen() {
       return
     }
 
-    // Add all selected items to cart
-    results.matched.forEach(item => {
-      if (selectedItems.includes(item.id)) {
-        addItem(item.product, item.quantity || 1)
-      }
-    })
+    const selectedProducts = results.matched.filter(item => selectedItems.includes(item.id))
+    const firstProduct = selectedProducts[0]?.product
+    if (!firstProduct) return
 
-    router.push('/checkout')
+    const productStoreId = firstProduct.store_id || firstProduct.stores?.id
+    const productStoreName = firstProduct.store_name || firstProduct.stores?.store_name || 'Store'
+
+    if (cartStoreId && cartStoreId !== productStoreId) {
+      Alert.alert(
+        'Clear Cart?',
+        `Your cart contains items from a different store. Clear it and add these items from ${productStoreName}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Clear & Add',
+            onPress: () => {
+              clearCart()
+              selectedProducts.forEach(item => {
+                addItem(item.product, item.quantity || 1)
+              })
+              router.push('/checkout')
+            }
+          }
+        ]
+      )
+    } else {
+      selectedProducts.forEach(item => {
+        addItem(item.product, item.quantity || 1)
+      })
+      router.push('/checkout')
+    }
   }
 
   return (
@@ -180,6 +214,13 @@ export default function AICartScreen() {
         {/* Results */}
         {results && !loading && (
           <>
+            {results.message ? (
+              <View style={styles.aiChatBubble}>
+                <Text style={styles.aiChatIcon}>🤖</Text>
+                <Text style={styles.aiChatText}>{results.message}</Text>
+              </View>
+            ) : null}
+
             {/* Matched Items */}
             {results.matched.length > 0 && (
               <View style={styles.resultsSection}>
@@ -197,7 +238,11 @@ export default function AICartScreen() {
                       onPress={() => toggleItem(item.id)}
                     >
                       <View style={styles.productImage}>
-                        <Text style={{ fontSize: 32 }}>🛒</Text>
+                        {item.product.image_url ? (
+                          <Image source={{ uri: item.product.image_url }} style={styles.productImageImg} />
+                        ) : (
+                          <Text style={{ fontSize: 32 }}>{item.product.emoji || '🛒'}</Text>
+                        )}
                       </View>
                       <View style={styles.productInfo}>
                         <Text style={styles.productName}>{item.product.name}</Text>
@@ -279,9 +324,8 @@ export default function AICartScreen() {
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* Input Bar */}
       <View style={styles.inputBar}>
-        <TouchableOpacity style={styles.cameraButton} onPress={handleGallery}>
+        <TouchableOpacity style={styles.cameraButton} onPress={handlePhotoPress}>
           <Text style={styles.cameraIcon}>📷</Text>
         </TouchableOpacity>
         <TextInput
@@ -367,4 +411,27 @@ const styles = StyleSheet.create({
                         alignItems: 'center', justifyContent: 'center' },
   sendButtonDisabled: { backgroundColor: '#E9ECEF' },
   sendIcon:           { fontSize: 20, color: '#FFFFFF', fontWeight: '700' },
+  productImageImg:    { width: '100%', height: '100%', borderRadius: 8, resizeMode: 'cover' },
+  aiChatBubble: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF0E6',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#FFE0CC',
+    gap: 12,
+  },
+  aiChatIcon: {
+    fontSize: 24,
+  },
+  aiChatText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#0D0D0D',
+    lineHeight: 20,
+    fontWeight: '500',
+  },
 })

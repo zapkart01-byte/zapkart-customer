@@ -21,7 +21,14 @@ export async function getProducts(categoryId = null) {
 
     const { data, error } = await query
     if (error) throw error
-    return { data, error: null }
+
+    // Map to include category_commission_rate
+    const mapped = data?.map(product => ({
+      ...product,
+      category_commission_rate: product.categories?.commission_rate ?? 0.18
+    }))
+
+    return { data: mapped, error: null }
   } catch (error) {
     return { data: null, error: error.message }
   }
@@ -55,6 +62,11 @@ export async function getProductById(id) {
       .single()
 
     if (error) throw error
+
+    if (data) {
+      data.category_commission_rate = data.categories?.commission_rate ?? 0.18
+    }
+
     return { data, error: null }
   } catch (error) {
     return { data: null, error: error.message }
@@ -119,4 +131,21 @@ export function getCustomerPrice(storePrice, platformMrp, markupPerItem = 1) {
 export function getDiscountPct(customerPrice, platformMrp) {
   if (customerPrice >= platformMrp) return 0
   return Math.round(((platformMrp - customerPrice) / platformMrp) * 100)
+}
+
+// Get active offers
+export async function getActiveOffers() {
+  try {
+    const now = new Date().toISOString()
+    const { data, error } = await supabase
+      .from('offers')
+      .select('*')
+      .eq('is_active', true)
+      .lte('valid_from', now)
+      .gte('valid_until', now)
+    if (error) throw error
+    return { data, error: null }
+  } catch (error) {
+    return { data: null, error: error.message }
+  }
 }

@@ -16,6 +16,11 @@ const useCartStore = create(
         const productStoreId = product.store_id || product.stores?.id
         const productStoreName = product.store_name || product.stores?.store_name || 'Store'
         
+        // Extract category commission rate
+        const categoryCommissionRate = product.category_commission_rate 
+          || product.categories?.commission_rate 
+          || 0.18
+
         // Different store — must clear cart first
         if (storeId && storeId !== productStoreId) {
           return { needsConfirmation: true, newProduct: product }
@@ -32,7 +37,7 @@ const useCartStore = create(
           })
         } else {
           set({
-            items:     [...items, { ...product, quantity }],
+            items:     [...items, { ...product, quantity, category_commission_rate: categoryCommissionRate }],
             storeId:   productStoreId,
             storeName: productStoreName,
           })
@@ -44,8 +49,11 @@ const useCartStore = create(
       forceAddItem: (product, quantity = 1) => {
         const productStoreId = product.store_id || product.stores?.id
         const productStoreName = product.store_name || product.stores?.store_name || 'Store'
+        const categoryCommissionRate = product.category_commission_rate 
+          || product.categories?.commission_rate 
+          || 0.18
         set({
-          items:     [{ ...product, quantity }],
+          items:     [{ ...product, quantity, category_commission_rate: categoryCommissionRate }],
           storeId:   productStoreId,
           storeName: productStoreName,
         })
@@ -95,7 +103,9 @@ const useCartStore = create(
         store_price:            i.store_price,
         platform_mrp:           i.platform_mrp,
         quantity:               i.quantity,
-        category_commission_rate: i.categories?.commission_rate || 0.18,
+        category_commission_rate: i.category_commission_rate 
+                                 || i.categories?.commission_rate 
+                                 || 0.18,
       })),
     }),
     {

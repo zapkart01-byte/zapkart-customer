@@ -3,7 +3,7 @@ import {
 } from 'react-native'
 import { useState, useEffect } from 'react'
 import { router } from 'expo-router'
-import { getMyOrders, getOrderById } from '../../.claude/services/orderService'
+import { getMyOrders, getOrderById } from '../../services/orderService'
 import useAuthStore from '../../store/authStore'
 import useCartStore from '../../store/cartStore'
 
@@ -22,11 +22,11 @@ export default function OrdersScreen() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('all')
   const { user } = useAuthStore()
-  const { addItem } = useCartStore()
+  const { addItem, clearCart, storeId: cartStoreId } = useCartStore()
 
   useEffect(() => {
     if (user?.id) loadOrders()
-  }, [user])
+  }, [user?.id])
 
   const loadOrders = async () => {
     setLoading(true)
@@ -42,28 +42,47 @@ export default function OrdersScreen() {
       return
     }
 
-    // Parse items from order
-    const items = JSON.parse(data.items || '[]')
-    let addedCount = 0
+    const orderItems = data.order_items || []
+    if (orderItems.length === 0) {
+      Alert.alert('Error', 'No items found in this order to reorder')
+      return
+    }
 
-    items.forEach(item => {
-      const result = addItem({
-        id: item.productId,
-        name: item.name,
-        store_price: item.price,
-        platform_mrp: item.mrp || item.price,
-        unit: item.unit || '1 unit',
-        store_id: data.store_id,
-        store_name: data.stores?.store_name
-      }, item.quantity)
+    const productStoreId = data.store_id
+    const productStoreName = data.stores?.store_name || 'Store'
 
-      if (!result.needsConfirmation) addedCount++
-    })
-
-    if (addedCount > 0) {
-      Alert.alert('Success', `${addedCount} items added to cart`, [
+    const proceedReorder = (shouldClear = false) => {
+      if (shouldClear) {
+        clearCart()
+      }
+      orderItems.forEach(item => {
+        if (item.products) {
+          addItem({
+            ...item.products,
+            store_id: productStoreId,
+            store_name: productStoreName
+          }, item.quantity)
+        }
+      })
+      Alert.alert('Success', 'Items added to cart', [
         { text: 'OK', onPress: () => router.push('/(tabs)/cart') }
       ])
+    }
+
+    if (cartStoreId && cartStoreId !== productStoreId) {
+      Alert.alert(
+        'Clear Cart?',
+        `Your cart contains items from a different store. Clear it and add items from ${productStoreName}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Clear & Add',
+            onPress: () => proceedReorder(true)
+          }
+        ]
+      )
+    } else {
+      proceedReorder(false)
     }
   }
 
@@ -152,8 +171,8 @@ export default function OrdersScreen() {
       ) : (
         <ScrollView showsVerticalScrollIndicator={false}>
           {filteredOrders.map(order => {
-            const itemsArray = JSON.parse(order.items || '[]')
-            const itemCount = itemsArray.reduce((sum, item) => sum + item.quantity, 0)
+            const orderItems = order.order_items || []
+            const itemCount = orderItems.reduce((sum, item) => sum + item.quantity, 0)
             const isActive = ['pending', 'confirmed', 'preparing', 'out_for_delivery'].includes(order.status)
             const isDelivered = order.status === 'delivered'
 

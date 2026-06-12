@@ -5,7 +5,12 @@ import { useEffect, useRef } from 'react'
 import { router, useLocalSearchParams } from 'expo-router'
 
 export default function OrderSuccessScreen() {
-  const { orderId, itemCount, total, deliveryTime } = useLocalSearchParams()
+  const params = useLocalSearchParams()
+  const orderId = params.orderId
+  const total = params.total || params.totalPaid || '0'
+  const deliveryTime = params.deliveryTime || params.estimatedTime || '30-40 mins'
+  const itemCount = params.itemCount || 'Items'
+  const paymentMethod = params.paymentMethod || 'Cash on Delivery'
   const checkmarkAnim = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
@@ -41,13 +46,13 @@ export default function OrderSuccessScreen() {
       {/* Delivery Time */}
       <View style={styles.deliveryBox}>
         <Text style={styles.deliveryLabel}>Estimated Delivery</Text>
-        <Text style={styles.deliveryTime}>{deliveryTime || '28 minutes'}</Text>
+        <Text style={styles.deliveryTime}>{deliveryTime}</Text>
       </View>
 
       {/* Order Summary */}
       <View style={styles.divider} />
       <Text style={styles.summary}>
-        {itemCount || 3} items · ₹{total || 237} · Cash on Delivery
+        {itemCount} · ₹{total} · {paymentMethod}
       </Text>
       <View style={styles.divider} />
 
@@ -77,9 +82,10 @@ export default function OrderSuccessScreen() {
 const styles = StyleSheet.create({
   container:          { flex: 1, backgroundColor: '#FFFFFF', alignItems: 'center',
                         justifyContent: 'center', padding: 24 },
-  successCircle:      { width: 80, height: 80, borderRadius: 40, backgroundColor: '#FF6B00',
-                        alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
-  checkmark:          { color: '#FFFFFF', fontSize: 48, fontWeight: '700' },
+  successCircle:      { width: 80, height: 80, borderRadius: 40, backgroundColor: '#FFF0E6', // Orange soft bg
+                        alignItems: 'center', justifyContent: 'center', marginBottom: 24,
+                        borderWidth: 2, borderColor: '#FF6B00' }, // Orange border
+  checkmark:          { color: '#16A34A', fontSize: 48, fontWeight: '750' }, // Green checkmark
   heading:            { fontSize: 28, fontWeight: '700', color: '#0D0D0D', textAlign: 'center' },
   orderId:            { fontSize: 14, color: '#6B7280', marginTop: 8, textAlign: 'center' },
   deliveryBox:        { marginTop: 24, alignItems: 'center' },

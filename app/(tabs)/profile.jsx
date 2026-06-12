@@ -4,7 +4,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
 import useAuthStore from '../../store/authStore'
-import { logout as authLogout } from '../../.claude/services/authService'
+import { logout as authLogout } from '../../services/authService'
 
 export default function ProfileScreen() {
   const { user, clearUser } = useAuthStore()

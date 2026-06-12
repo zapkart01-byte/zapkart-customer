@@ -4,7 +4,7 @@ import {
 import { useState, useEffect, useRef } from 'react'
 import { useLocalSearchParams } from 'expo-router'
 import io from 'socket.io-client'
-import { getOrderById, subscribeToOrder } from '../../.claude/services/orderService'
+import { getOrderById, subscribeToOrder } from '../../services/orderService'
 
 const MAPTILER_KEY = process.env.EXPO_PUBLIC_MAPTILER_KEY
 const API_URL = process.env.EXPO_PUBLIC_API_URL
@@ -114,8 +114,8 @@ export default function TrackingScreen() {
   }
 
   const getStatusSteps = () => {
-    const statuses = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered']
-    const currentIndex = statuses.indexOf(order?.status || 'pending')
+    const statuses = ['placed', 'confirmed', 'preparing', 'out_for_delivery', 'delivered']
+    const currentIndex = statuses.indexOf(order?.status || 'placed')
     return statuses.map((status, index) => ({
       label: status.replace(/_/g, ' ').toUpperCase(),
       active: index <= currentIndex,

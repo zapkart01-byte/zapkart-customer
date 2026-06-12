@@ -43,7 +43,11 @@ export async function getMyOrders(customerId) {
       .select(`
         *,
         stores (store_name),
-        riders (name, phone)
+        riders (name, phone),
+        order_items (
+          *,
+          products (*)
+        )
       `)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
@@ -63,7 +67,11 @@ export async function getOrderById(orderId) {
       .select(`
         *,
         stores (store_name, address, lat, lng),
-        riders (name, phone, rating)
+        riders (name, phone, rating),
+        order_items (
+          *,
+          products (*)
+        )
       `)
       .eq('id', orderId)
       .single()

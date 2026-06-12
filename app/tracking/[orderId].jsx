@@ -3,7 +3,8 @@ import {
 } from 'react-native'
 import { useState, useEffect, useRef } from 'react'
 import { useLocalSearchParams, router } from 'expo-router'
-import { getOrderById, subscribeToOrder } from '../../.claude/services/orderService'
+import { getOrderById, subscribeToOrder } from '../../services/orderService'
+import io from 'socket.io-client'
 
 // Conditional import for MapLibre - only on native
 let MapLibreGL = null
@@ -17,17 +18,65 @@ if (Platform.OS !== 'web') {
 }
 
 const MAPTILER_KEY = process.env.EXPO_PUBLIC_MAPTILER_KEY
+const API_URL = process.env.EXPO_PUBLIC_API_URL
 
 export default function TrackingScreen() {
   const { orderId } = useLocalSearchParams()
   const [order, setOrder] = useState(null)
   const [riderLocation, setRiderLocation] = useState(null)
   const [loading, setLoading] = useState(true)
+  
   const pulseAnim = useRef(new Animated.Value(1)).current
+  const riderLocationRef = useRef(null)
+  const targetLocationRef = useRef(null)
+  const animationFrameRef = useRef(null)
+  const socketRef = useRef(null)
+  const supabaseSubRef = useRef(null)
 
   useEffect(() => {
     loadOrder()
     startPulseAnimation()
+    connectSocket()
+
+    // LERP loop for smooth rider sliding
+    const lerpLoop = () => {
+      if (riderLocationRef.current && targetLocationRef.current) {
+        const curLat = riderLocationRef.current.latitude
+        const curLng = riderLocationRef.current.longitude
+        const tarLat = targetLocationRef.current.latitude
+        const tarLng = targetLocationRef.current.longitude
+
+        const dLat = tarLat - curLat
+        const dLng = tarLng - curLng
+
+        // If distance is extremely small, snap to target
+        if (Math.abs(dLat) < 0.00001 && Math.abs(dLng) < 0.00001) {
+          riderLocationRef.current = targetLocationRef.current
+        } else {
+          riderLocationRef.current = {
+            latitude: curLat + dLat * 0.1, // Smooth LERP interpolation step
+            longitude: curLng + dLng * 0.1
+          }
+        }
+        setRiderLocation(riderLocationRef.current)
+      }
+      animationFrameRef.current = requestAnimationFrame(lerpLoop)
+    }
+    
+    animationFrameRef.current = requestAnimationFrame(lerpLoop)
+
+    return () => {
+      // Clean up LERP animation loop
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+      }
+      // Clean up socket
+      cleanupSocket()
+      // Clean up Supabase subscription
+      if (supabaseSubRef.current) {
+        supabaseSubRef.current.unsubscribe()
+      }
+    }
   }, [orderId])
 
   const loadOrder = async () => {
@@ -35,23 +84,78 @@ export default function TrackingScreen() {
     if (data) {
       setOrder(data)
       if (data.riders?.lat && data.riders?.lng) {
-        setRiderLocation({
-          latitude: data.riders.lat,
-          longitude: data.riders.lng
-        })
+        initializeRiderLocation(data.riders.lat, data.riders.lng)
       } else if (data.stores?.lat && data.stores?.lng) {
-        setRiderLocation({
-          latitude: data.stores.lat,
-          longitude: data.stores.lng
-        })
+        initializeRiderLocation(data.stores.lat, data.stores.lng)
       }
     }
     setLoading(false)
 
-    // Subscribe to real-time order updates
-    subscribeToOrder(orderId, (updatedOrder) => {
-      setOrder(prev => ({ ...prev, ...updatedOrder }))
+    // Subscribe to real-time order updates (Supabase Realtime fallback)
+    supabaseSubRef.current = subscribeToOrder(orderId, (updatedOrder) => {
+      setOrder(prev => {
+        const newOrder = { ...prev, ...updatedOrder }
+        if (newOrder.status === 'delivered') {
+          cleanupSocket()
+        }
+        return newOrder
+      })
     })
+  }
+
+  const initializeRiderLocation = (lat, lng) => {
+    const loc = { latitude: Number(lat), longitude: Number(lng) }
+    setRiderLocation(loc)
+    riderLocationRef.current = loc
+    targetLocationRef.current = loc
+  }
+
+  const updateTargetLocation = (lat, lng) => {
+    targetLocationRef.current = { latitude: lat, longitude: lng }
+  }
+
+  const connectSocket = () => {
+    if (!API_URL) return
+    
+    cleanupSocket()
+
+    const socket = io(API_URL)
+    socketRef.current = socket
+
+    socket.on('connect', () => {
+      console.log('Socket.io connected to order:', orderId)
+      socket.emit('join-order', orderId)
+    })
+
+    socket.on('location:update', (data) => {
+      console.log('Rider location update via Socket.io:', data)
+      if (data && data.lat && data.lng) {
+        updateTargetLocation(Number(data.lat), Number(data.lng))
+      }
+    })
+
+    socket.on('order:status', (data) => {
+      console.log('Order status update via Socket.io:', data)
+      if (data && data.status) {
+        setOrder(prev => {
+          if (!prev) return prev
+          return { ...prev, status: data.status }
+        })
+        if (data.status === 'delivered') {
+          cleanupSocket()
+        }
+      }
+    })
+  }
+
+  const cleanupSocket = () => {
+    if (socketRef.current) {
+      socketRef.current.emit('leave-order', orderId)
+      socketRef.current.disconnect()
+      socketRef.current.removeAllListeners()
+      socketRef.current = null
+      console.log('Socket.io connection cleaned up for order:', orderId)
+    }
   }
 
   const startPulseAnimation = () => {
@@ -105,7 +209,7 @@ export default function TrackingScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Map Section */}
+      {/* Map Section - Exactly 52% Height */}
       {hasMap && riderLocation ? (
         <View style={styles.mapContainer}>
           <MapLibreGL.MapView
@@ -124,7 +228,7 @@ export default function TrackingScreen() {
             {order?.stores?.lat && order?.stores?.lng && (
               <MapLibreGL.PointAnnotation
                 id="store"
-                coordinate={[order.stores.lng, order.stores.lat]}
+                coordinate={[Number(order.stores.lng), Number(order.stores.lat)]}
               >
                 <View style={styles.markerStore}>
                   <Text style={styles.markerText}>🏪</Text>
@@ -136,7 +240,7 @@ export default function TrackingScreen() {
             {riderLocation && (
               <MapLibreGL.PointAnnotation
                 id="rider"
-                coordinate={[riderLocation.longitude, riderLocation.latitude]}
+                coordinate={[Number(riderLocation.longitude), Number(riderLocation.latitude)]}
               >
                 <View style={styles.riderMarkerContainer}>
                   <Animated.View style={[
@@ -148,6 +252,48 @@ export default function TrackingScreen() {
                   </View>
                 </View>
               </MapLibreGL.PointAnnotation>
+            )}
+
+            {/* Customer Marker */}
+            {order?.delivery_address?.lat && order?.delivery_address?.lng && (
+              <MapLibreGL.PointAnnotation
+                id="customer"
+                coordinate={[Number(order.delivery_address.lng), Number(order.delivery_address.lat)]}
+              >
+                <View style={styles.markerCustomer}>
+                  <Text style={styles.markerText}>📍</Text>
+                </View>
+              </MapLibreGL.PointAnnotation>
+            )}
+
+            {/* Orange Dashed Route Line (Store -> Rider -> Customer) */}
+            {order?.stores?.lat && order?.stores?.lng && riderLocation && order?.delivery_address?.lat && order?.delivery_address?.lng && (
+              <MapLibreGL.ShapeSource
+                id="routeSource"
+                shape={{
+                  type: 'Feature',
+                  properties: {},
+                  geometry: {
+                    type: 'LineString',
+                    coordinates: [
+                      [Number(order.stores.lng), Number(order.stores.lat)],
+                      [Number(riderLocation.longitude), Number(riderLocation.latitude)],
+                      [Number(order.delivery_address.lng), Number(order.delivery_address.lat)]
+                    ]
+                  }
+                }}
+              >
+                <MapLibreGL.LineLayer
+                  id="routeLine"
+                  style={{
+                    lineColor: '#FF6B00',
+                    lineWidth: 4,
+                    lineDasharray: [2, 2],
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                  }}
+                />
+              </MapLibreGL.ShapeSource>
             )}
           </MapLibreGL.MapView>
         </View>
@@ -195,7 +341,7 @@ export default function TrackingScreen() {
             </View>
           )}
 
-          {/* Progress Timeline */}
+          {/* Progress Timeline - 5 Steps */}
           <View style={styles.progressContainer}>
             {statusSteps.map((step, index) => (
               <View key={index} style={styles.progressItem}>
@@ -279,9 +425,9 @@ const styles = StyleSheet.create({
   container:          { flex: 1, backgroundColor: '#FFFFFF' },
   loadingContainer:   { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText:        { color: '#FF6B00', fontSize: 16 },
-  mapContainer:       { height: '45%' },
+  mapContainer:       { height: '52%' },
   map:                { flex: 1 },
-  noMapContainer:     { height: '25%', backgroundColor: '#F8F9FA', justifyContent: 'center',
+  noMapContainer:     { height: '52%', backgroundColor: '#F8F9FA', justifyContent: 'center',
                         paddingHorizontal: 16 },
   statusBanner:       { flexDirection: 'row', alignItems: 'center', padding: 20,
                         borderRadius: 16 },
@@ -290,6 +436,9 @@ const styles = StyleSheet.create({
   statusBannerTitle:  { fontSize: 18, fontWeight: '700', color: '#FFFFFF', marginBottom: 4 },
   statusBannerSubtitle: { fontSize: 14, color: 'rgba(255, 255, 255, 0.9)' },
   markerStore:        { width: 40, height: 40, backgroundColor: '#16A34A', borderRadius: 20,
+                        alignItems: 'center', justifyContent: 'center', borderWidth: 3,
+                        borderColor: '#FFFFFF' },
+  markerCustomer:     { width: 40, height: 40, backgroundColor: '#EF4444', borderRadius: 20,
                         alignItems: 'center', justifyContent: 'center', borderWidth: 3,
                         borderColor: '#FFFFFF' },
   riderMarkerContainer: { alignItems: 'center', justifyContent: 'center' },
