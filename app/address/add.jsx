@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, KeyboardAvoidingView, Platform, Dimensions
+  ScrollView, Alert, KeyboardAvoidingView, Platform, Dimensions,
+  ActivityIndicator
 } from 'react-native'
 import { router } from 'expo-router'
 import { ArrowLeft, MapPin, Check } from 'lucide-react-native'
+import * as Location from 'expo-location'
 // Conditional import for MapLibre - only on native
 let MapLibreGL = null
 if (Platform.OS !== 'web') {
@@ -31,7 +33,44 @@ export default function AddAddressScreen() {
   const [coordinates, setCoordinates] = useState([77.5946, 12.9716]) // Bangalore as default
   
   const [saving, setSaving] = useState(false)
+  const [loadingLocation, setLoadingLocation] = useState(false)
   const mapRef = useRef(null)
+
+  const getCurrentLocation = async () => {
+    setLoadingLocation(true)
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync()
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Location permission is required to fetch your current coordinates.')
+        setLoadingLocation(false)
+        return
+      }
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      })
+      const { latitude, longitude } = location.coords
+      setCoordinates([longitude, latitude])
+      
+      // Update street/locality field using reverse geocoding
+      try {
+        const result = await Location.reverseGeocodeAsync({ latitude, longitude })
+        if (result && result.length > 0) {
+          const loc = result[0]
+          const streetStr = [loc.name, loc.street, loc.district, loc.city]
+            .filter(Boolean)
+            .join(', ')
+          setStreetArea(streetStr)
+        }
+      } catch (geoErr) {
+        console.warn('Reverse geocode error:', geoErr)
+      }
+    } catch (err) {
+      console.error('Fetch location error:', err)
+      Alert.alert('Error', 'Failed to get your current location.')
+    } finally {
+      setLoadingLocation(false)
+    }
+  }
 
   const handleSave = async () => {
     if (!houseNumber.trim() || !streetArea.trim()) {
@@ -80,7 +119,7 @@ export default function AddAddressScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Add Delivery Address</Text>
       </View>
-
+ 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Map Section */}
         <View style={styles.mapContainer}>
@@ -98,12 +137,13 @@ export default function AddAddressScreen() {
                   centerCoordinate: [77.5946, 12.9716],
                   zoomLevel: 14
                 }}
+                centerCoordinate={coordinates}
               />
             </MapLibreGL.MapView>
           ) : (
             <View style={styles.map}>
               <iframe
-                src={`https://api.maptiler.com/maps/streets-v2/?key=${MAPTILER_KEY}#14/12.9716/77.5946`}
+                src={`https://api.maptiler.com/maps/streets-v2/?key=${MAPTILER_KEY}#14/${coordinates[1]}/${coordinates[0]}`}
                 style={{ width: '100%', height: '100%', border: 'none' }}
                 title="Delivery Address Map"
               />
@@ -117,6 +157,21 @@ export default function AddAddressScreen() {
             </View>
           </View>
           <Text style={styles.mapTip}>Drag the map to position the pin exactly</Text>
+          
+          {/* Floating Use Current Location Button */}
+          <TouchableOpacity 
+            style={styles.locationFloatingBtn} 
+            onPress={getCurrentLocation}
+            disabled={loadingLocation}
+            activeOpacity={0.9}
+          >
+            {loadingLocation ? (
+              <ActivityIndicator size="small" color="#FF6B00" />
+            ) : (
+              <MapPin color="#FF6B00" size={16} fill="#FFF0E6" />
+            )}
+            <Text style={styles.locationFloatingBtnText}>Use Current Location</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Input Form Section */}
@@ -278,6 +333,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
+  },
+  locationFloatingBtn: {
+    position: 'absolute',
+    right: 12,
+    bottom: 44,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  locationFloatingBtnText: {
+    color: '#FF6B00',
+    fontSize: 12,
+    fontWeight: '750',
   },
   formContainer: {
     padding: 20,

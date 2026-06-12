@@ -4,7 +4,7 @@ import {
 } from 'react-native'
 import { useState, useEffect } from 'react'
 import { Search, Sparkles, ShoppingCart, Plus, Minus, ArrowRight } from 'lucide-react-native'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import { getProducts, getCustomerPrice, getDiscountPct } from '../../services/productService'
 import useCartStore from '../../store/cartStore'
 
@@ -14,6 +14,9 @@ const POPULAR_SUGGESTIONS = [
 ]
 
 export default function SearchScreen() {
+  const params = useLocalSearchParams()
+  const cat = params.cat
+
   const [query, setQuery] = useState('')
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -61,7 +64,22 @@ export default function SearchScreen() {
     }
   }
 
+  const activeCategoryName = products.find(p => p.category_id === cat)?.categories?.name || 'Category'
+
   const filteredProducts = products.filter(product => {
+    // If a category is selected via URL query param
+    if (cat && product.category_id === cat) {
+      if (query) {
+        const term = query.toLowerCase()
+        return (
+          product.name?.toLowerCase().includes(term) ||
+          product.categories?.name?.toLowerCase().includes(term)
+        )
+      }
+      return true
+    }
+
+    // Otherwise, normal text search (only show results if query is entered)
     if (!query) return false
     const term = query.toLowerCase()
     return (
@@ -119,7 +137,7 @@ export default function SearchScreen() {
 
       {!loading && !error && (
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {query.length === 0 ? (
+          {query.length === 0 && !cat ? (
             <View style={styles.suggestSection}>
               <Text style={styles.sectionTitle}>Popular Searches</Text>
               <View style={styles.chipGrid}>
@@ -136,11 +154,39 @@ export default function SearchScreen() {
             </View>
           ) : filteredProducts.length === 0 ? (
             <View style={styles.emptyContainer}>
+              {cat && (
+                <View style={styles.categoryFilterContainer}>
+                  <Text style={styles.categoryFilterLabel}>Filtering by:</Text>
+                  <View style={styles.categoryChip}>
+                    <Text style={styles.categoryChipText}>{activeCategoryName}</Text>
+                    <TouchableOpacity 
+                      style={styles.categoryChipClose} 
+                      onPress={() => router.setParams({ cat: undefined })}
+                    >
+                      <Text style={styles.categoryChipCloseText}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
               <Text style={styles.emptyTitle}>No products found</Text>
               <Text style={styles.emptySubtitle}>Try searching for paneer, milk, or chocolates instead.</Text>
             </View>
           ) : (
             <View style={styles.resultsContainer}>
+              {cat && (
+                <View style={styles.categoryFilterContainer}>
+                  <Text style={styles.categoryFilterLabel}>Filtering by:</Text>
+                  <View style={styles.categoryChip}>
+                    <Text style={styles.categoryChipText}>{activeCategoryName}</Text>
+                    <TouchableOpacity 
+                      style={styles.categoryChipClose} 
+                      onPress={() => router.setParams({ cat: undefined })}
+                    >
+                      <Text style={styles.categoryChipCloseText}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
               <Text style={styles.sectionTitle}>Search Results ({filteredProducts.length})</Text>
               <View style={styles.productGrid}>
                 {filteredProducts.map(product => {
@@ -450,4 +496,48 @@ const styles = StyleSheet.create({
     height: '100%',
     resizeMode: 'cover',
   },
+  categoryFilterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  categoryFilterLabel: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF0E6',
+    borderWidth: 1,
+    borderColor: '#FFE0CC',
+    paddingLeft: 12,
+    paddingRight: 8,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  categoryChipText: {
+    fontSize: 13,
+    color: '#FF6B00',
+    fontWeight: '700',
+  },
+  categoryChipClose: {
+    backgroundColor: '#FF6B00',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryChipCloseText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+    lineHeight: 12,
+  },
 })
+

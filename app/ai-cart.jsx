@@ -1,10 +1,12 @@
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, ActivityIndicator, Image
+  StyleSheet, Alert, ActivityIndicator, Image, Platform
 } from 'react-native'
 import { useState } from 'react'
 import { router } from 'expo-router'
-import { parseTextList, parseImageList } from '../services/aiCartService'
+import * as ImagePicker from 'expo-image-picker'
+import { Audio } from 'expo-av'
+import { parseTextList, parseImageList, parseVoiceInput } from '../services/aiCartService'
 import useCartStore from '../store/cartStore'
 
 export default function AICartScreen() {
@@ -13,6 +15,76 @@ export default function AICartScreen() {
   const [results, setResults] = useState(null)
   const [selectedItems, setSelectedItems] = useState([])
   const { items: cartItems, storeId: cartStoreId, clearCart, addItem } = useCartStore()
+
+  const [recording, setRecording] = useState(null)
+  const [isRecording, setIsRecording] = useState(false)
+
+  const startRecording = async () => {
+    try {
+      const permission = await Audio.requestPermissionsAsync()
+      if (permission.status !== 'granted') {
+        Alert.alert('Permission needed', 'Microphone access is required')
+        return
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      })
+
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      )
+      setRecording(recording)
+      setIsRecording(true)
+    } catch (err) {
+      console.error('Failed to start recording', err)
+      Alert.alert('Error', 'Failed to start recording: ' + err.message)
+    }
+  }
+
+  const stopRecording = async () => {
+    if (!recording) return
+    setIsRecording(false)
+    setRecording(null)
+
+    try {
+      await recording.stopAndUnloadAsync()
+      const uri = recording.getURI()
+      
+      const response = await fetch(uri)
+      const blob = await response.blob()
+      const base64 = await new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          const base64data = reader.result.split(',')[1]
+          resolve(base64data)
+        }
+        reader.readAsDataURL(blob)
+      })
+
+      if (base64) {
+        processVoice(base64)
+      }
+    } catch (err) {
+      console.error('Failed to stop recording', err)
+      Alert.alert('Error', 'Failed to stop recording: ' + err.message)
+    }
+  }
+
+  const processVoice = async (base64Audio) => {
+    setLoading(true)
+    setResults(null)
+    const { data, error } = await parseVoiceInput(base64Audio)
+    setLoading(false)
+
+    if (error) {
+      Alert.alert('Error', error)
+    } else if (data) {
+      setResults(data)
+      setSelectedItems(data.matched.map(item => item.id))
+    }
+  }
 
   const exampleChips = [
     '2L milk, 6 eggs, bread',
@@ -328,19 +400,27 @@ export default function AICartScreen() {
         <TouchableOpacity style={styles.cameraButton} onPress={handlePhotoPress}>
           <Text style={styles.cameraIcon}>📷</Text>
         </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.cameraButton, isRecording && styles.recordingButton]} 
+          onPress={isRecording ? stopRecording : startRecording}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.cameraIcon}>{isRecording ? '🛑' : '🎙️'}</Text>
+        </TouchableOpacity>
         <TextInput
           style={styles.input}
-          placeholder="Type anything... milk, eggs, bread"
+          placeholder={isRecording ? "Listening..." : "Type anything... milk, eggs, bread"}
           placeholderTextColor="#9CA3AF"
           value={inputText}
           onChangeText={setInputText}
           multiline
           maxLength={200}
+          editable={!isRecording}
         />
         <TouchableOpacity
-          style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
+          style={[styles.sendButton, (!inputText.trim() || isRecording) && styles.sendButtonDisabled]}
           onPress={handleSend}
-          disabled={!inputText.trim()}
+          disabled={!inputText.trim() || isRecording}
         >
           <Text style={styles.sendIcon}>→</Text>
         </TouchableOpacity>
@@ -405,6 +485,11 @@ const styles = StyleSheet.create({
                         borderTopColor: '#E9ECEF', gap: 8 },
   cameraButton:       { width: 40, height: 40, backgroundColor: '#F8F9FA', borderRadius: 20,
                         alignItems: 'center', justifyContent: 'center' },
+  recordingButton: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#EF4444'
+  },
   cameraIcon:         { fontSize: 20 },
   input:              { flex: 1, fontSize: 14, color: '#0D0D0D', maxHeight: 80 },
   sendButton:         { width: 40, height: 40, backgroundColor: '#FF6B00', borderRadius: 20,
