@@ -749,7 +749,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 14,
-    resizeMode: 'cover',
+    resizeMode: 'stretch',
   },
   bannerPlaceholder: {
     width: '100%',
