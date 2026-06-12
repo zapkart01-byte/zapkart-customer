@@ -268,7 +268,7 @@ export default function CheckoutScreen() {
                     <View style={styles.addressInfo}>
                       <Text style={styles.addressLabel}>{item.label}</Text>
                       <Text style={styles.addressText}>{item.fullAddress}</Text>
-                      {item.landmark && (
+                      {!!item.landmark && (
                         <Text style={styles.landmarkText}>Landmark: {item.landmark}</Text>
                       )}
                     </View>

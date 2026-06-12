@@ -376,7 +376,7 @@ export default function TrackingScreen() {
           <View style={styles.infoCard}>
             <Text style={styles.infoLabel}>Delivery Address</Text>
             <Text style={styles.infoValue}>{order?.delivery_address?.fullAddress}</Text>
-            {order?.delivery_address?.landmark && (
+            {!!order?.delivery_address?.landmark && (
               <Text style={styles.infoSubtext}>Landmark: {order.delivery_address.landmark}</Text>
             )}
           </View>
