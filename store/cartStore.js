@@ -13,9 +13,11 @@ const useCartStore = create(
       // Add item — enforces single store rule
       addItem: (product, quantity = 1) => {
         const { items, storeId } = get()
+        const productStoreId = product.store_id || product.stores?.id
+        const productStoreName = product.store_name || product.stores?.store_name || 'Store'
         
         // Different store — must clear cart first
-        if (storeId && storeId !== product.store_id) {
+        if (storeId && storeId !== productStoreId) {
           return { needsConfirmation: true, newProduct: product }
         }
 
@@ -31,8 +33,8 @@ const useCartStore = create(
         } else {
           set({
             items:     [...items, { ...product, quantity }],
-            storeId:   product.store_id,
-            storeName: product.store_name || 'Store',
+            storeId:   productStoreId,
+            storeName: productStoreName,
           })
         }
         return { needsConfirmation: false }
@@ -40,10 +42,12 @@ const useCartStore = create(
 
       // Force add — clears existing cart from different store
       forceAddItem: (product, quantity = 1) => {
+        const productStoreId = product.store_id || product.stores?.id
+        const productStoreName = product.store_name || product.stores?.store_name || 'Store'
         set({
           items:     [{ ...product, quantity }],
-          storeId:   product.store_id,
-          storeName: product.store_name || 'Store',
+          storeId:   productStoreId,
+          storeName: productStoreName,
         })
       },
 
