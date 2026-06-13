@@ -140,13 +140,19 @@ export default function AddAddressScreen() {
                 centerCoordinate={coordinates}
               />
             </MapLibreGL.MapView>
-          ) : (
+          ) : Platform.OS === 'web' ? (
             <View style={styles.map}>
               <iframe
                 src={`https://api.maptiler.com/maps/streets-v2/?key=${MAPTILER_KEY}#14/${coordinates[1]}/${coordinates[0]}`}
                 style={{ width: '100%', height: '100%', border: 'none' }}
                 title="Delivery Address Map"
               />
+            </View>
+          ) : (
+            <View style={styles.mapFallback}>
+              <MapPin color="#FF6B00" size={40} />
+              <Text style={styles.mapFallbackText}>Map not available</Text>
+              <Text style={styles.mapFallbackSub}>Pin will be placed at your saved coordinates</Text>
             </View>
           )}
           {/* Static Centered Pin Marker */}
@@ -299,6 +305,24 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  mapFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+    gap: 8,
+  },
+  mapFallbackText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  mapFallbackSub: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   staticPinContainer: {
     position: 'absolute',

@@ -2,8 +2,8 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Image
 } from 'react-native'
-import { useState, useEffect } from 'react'
-import { router, useLocalSearchParams } from 'expo-router'
+import { useState, useEffect, useCallback } from 'react'
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { ArrowLeft, MapPin, Plus, DollarSign, CreditCard, ChevronRight, Check } from 'lucide-react-native'
 import useCartStore from '../store/cartStore'
 import useAuthStore from '../store/authStore'
@@ -44,12 +44,13 @@ export default function CheckoutScreen() {
   }, [])
 
   // Reload addresses when screen focuses (if navigating back from address addition)
-  useEffect(() => {
-    const focusInterval = setInterval(() => {
-      fetchUserAddresses()
-    }, 1500)
-    return () => clearInterval(focusInterval)
-  }, [])
+  useFocusEffect(
+    useCallback(() => {
+      if (addresses.length > 0 || storeCoords) {
+        fetchUserAddresses()
+      }
+    }, [storeCoords])
+  )
 
   useEffect(() => {
     if (selectedAddress && storeCoords) {
