@@ -1,7 +1,7 @@
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { useState, useRef, useEffect } from 'react'
 import { router, useLocalSearchParams } from 'expo-router'
-import { verifyOTP, saveUser } from '../../.claude/services/authService'
+import { verifyOTP, saveUser } from '../../services/authService'
 import useAuthStore from '../../store/authStore'
 
 export default function OTPScreen() {

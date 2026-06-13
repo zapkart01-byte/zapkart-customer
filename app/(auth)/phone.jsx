@@ -1,7 +1,7 @@
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { useState } from 'react'
 import { router } from 'expo-router'
-import { sendOTP } from '../../.claude/services/authService'
+import { sendOTP } from '../../services/authService'
 
 export default function PhoneScreen() {
   const [phone,   setPhone]   = useState('')
@@ -22,7 +22,7 @@ export default function PhoneScreen() {
       console.log('Navigating to OTP screen')
       router.push({ pathname: '/(auth)/otp', params: { phone: '+91' + phone } })
     } else {
-      Alert.alert('Error', error || 'Could not send OTP. Make sure the backend is running on http://localhost:3000')
+      Alert.alert('Error', error || 'Could not send OTP. Make sure the backend is running.')
     }
   }
 
@@ -69,14 +69,6 @@ export default function PhoneScreen() {
           {' '}and{' '}
           <Text style={styles.termsLink}>Privacy Policy</Text>
         </Text>
-
-        {/* Dev Mode Link */}
-        <TouchableOpacity 
-          style={styles.devLink}
-          onPress={() => router.push('/(auth)/dev-bypass')}
-        >
-          <Text style={styles.devLinkText}>🛠️ Dev Mode (Skip Auth)</Text>
-        </TouchableOpacity>
       </View>
     </View>
   )

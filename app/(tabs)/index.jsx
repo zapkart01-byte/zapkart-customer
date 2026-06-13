@@ -1,6 +1,6 @@
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Dimensions, FlatList, Image, Alert
+  Dimensions, FlatList, Image, Alert, useWindowDimensions
 } from 'react-native'
 import { useState, useEffect, useRef } from 'react'
 import { router } from 'expo-router'
@@ -17,6 +17,7 @@ import ErrorState from '../../components/ui/ErrorState'
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
 export default function HomeScreen() {
+  const { width: SCREEN_WIDTH } = useWindowDimensions()
   const [categories, setCategories] = useState([])
   const [products, setProducts] = useState([])
   const [banners, setBanners] = useState([])
@@ -736,7 +737,7 @@ const styles = StyleSheet.create({
     borderColor: '#FFF0E6',
   },
   carouselContainer: {
-    width: SCREEN_WIDTH,
+    width: '100%',
     height: 160,
     marginBottom: 20,
     position: 'relative',
@@ -749,7 +750,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 14,
-    resizeMode: 'stretch',
+    resizeMode: 'cover',
   },
   bannerPlaceholder: {
     width: '100%',

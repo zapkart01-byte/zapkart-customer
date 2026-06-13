@@ -7,7 +7,6 @@ export default function AuthLayout() {
       <Stack.Screen name="phone" />
       <Stack.Screen name="otp" />
       <Stack.Screen name="name" />
-      <Stack.Screen name="dev-bypass" />
     </Stack>
   )
 }
