@@ -2,13 +2,14 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityInd
 import { useState } from 'react'
 import { router } from 'expo-router'
 import useAuthStore from '../../store/authStore'
-import { supabase } from '../../services/supabase'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL
 
 export default function NameScreen() {
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
-  const { user, updateName } = useAuthStore()
+  const { user, token, updateName } = useAuthStore()
 
   const handleContinue = async () => {
     if (!name.trim()) return
@@ -17,14 +18,17 @@ export default function NameScreen() {
       // Save name to local store
       updateName(name.trim())
 
-      // Save name to backend users table
-      if (user?.id) {
-        const { error } = await supabase
-          .from('users')
-          .update({ name: name.trim(), updated_at: new Date().toISOString() })
-          .eq('id', user.id)
-
-        if (error) console.warn('Failed to save name:', error.message)
+      // Save name to backend users table via service role
+      if (user?.id && token) {
+        try {
+          await fetch(`${API_URL}/auth/mobile/update-profile`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ name: name.trim() })
+          })
+        } catch (fetchErr) {
+          console.warn('Failed to save name to backend:', fetchErr.message)
+        }
       }
 
       // Also save name to AsyncStorage user_data

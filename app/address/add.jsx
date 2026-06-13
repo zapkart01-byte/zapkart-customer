@@ -56,13 +56,16 @@ export default function AddAddressScreen() {
         const result = await Location.reverseGeocodeAsync({ latitude, longitude })
         if (result && result.length > 0) {
           const loc = result[0]
-          const streetStr = [loc.name, loc.street, loc.district, loc.city]
+          const streetStr = [loc.name, loc.street, loc.district, loc.city, loc.region]
             .filter(Boolean)
             .join(', ')
-          setStreetArea(streetStr)
+          setStreetArea(streetStr || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
+        } else {
+          setStreetArea(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
         }
       } catch (geoErr) {
         console.warn('Reverse geocode error:', geoErr)
+        setStreetArea(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
       }
     } catch (err) {
       console.error('Fetch location error:', err)

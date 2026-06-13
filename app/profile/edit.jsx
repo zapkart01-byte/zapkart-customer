@@ -5,7 +5,8 @@ import {
 import { useState } from 'react'
 import { router } from 'expo-router'
 import useAuthStore from '../../store/authStore'
-import { supabase } from '../../services/supabase'
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL
 
 export default function EditProfileScreen() {
   const { user, token, setUser } = useAuthStore()
@@ -23,26 +24,18 @@ export default function EditProfileScreen() {
     setLoading(true)
 
     try {
-      const updatedUser = {
-        ...user,
-        name: name.trim(),
-        email: email.trim() || null,
-        location: location.trim() || null,
-      }
+      const res = await fetch(`${API_URL}/auth/mobile/update-profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: name.trim(), email: email.trim() || null })
+      })
 
-      const { error } = await supabase
-        .from('users')
-        .update({
-          name: name.trim(),
-          email: email.trim() || null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id)
+      const data = await res.json()
 
-      if (error) throw error
+      if (!res.ok) throw new Error(data.message || 'Failed to update profile')
 
-      // Update local auth store preserving token
-      setUser(updatedUser, token)
+      // Update local auth store with returned user data
+      setUser(data.user, token)
       
       Alert.alert('Success', 'Profile updated successfully', [
         { text: 'OK', onPress: () => router.back() }
