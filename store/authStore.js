@@ -13,7 +13,10 @@ const useAuthStore = create(
       setUser: (user, token) => set({ user, token }),
 
       // Clear on logout
-      clearUser: () => set({ user: null, token: null }),
+      clearUser: () => {
+        set({ user: null, token: null })
+        useAuthStore.persist.clearStorage()
+      },
 
       // Check if logged in
       isLoggedIn: () => !!get().token,

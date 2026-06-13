@@ -5,10 +5,10 @@ import {
 import { useState } from 'react'
 import { router } from 'expo-router'
 import useAuthStore from '../../store/authStore'
-import { supabase } from '../../.claude/services/supabase'
+import { supabase } from '../../services/supabase'
 
 export default function EditProfileScreen() {
-  const { user, setUser } = useAuthStore()
+  const { user, token, setUser } = useAuthStore()
   
   const [name, setName] = useState(user?.name || '')
   const [email, setEmail] = useState(user?.email || '')
@@ -23,20 +23,26 @@ export default function EditProfileScreen() {
     setLoading(true)
 
     try {
-      const { data, error } = await supabase
-        .from('customers')
+      const updatedUser = {
+        ...user,
+        name: name.trim(),
+        email: email.trim() || null,
+        location: location.trim() || null,
+      }
+
+      const { error } = await supabase
+        .from('users')
         .update({
           name: name.trim(),
-          email: email.trim() || null
+          email: email.trim() || null,
+          updated_at: new Date().toISOString()
         })
         .eq('id', user.id)
-        .select()
-        .single()
 
       if (error) throw error
 
-      // Update local auth store
-      setUser(data)
+      // Update local auth store preserving token
+      setUser(updatedUser, token)
       
       Alert.alert('Success', 'Profile updated successfully', [
         { text: 'OK', onPress: () => router.back() }

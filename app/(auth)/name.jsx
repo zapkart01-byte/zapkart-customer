@@ -1,16 +1,49 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native'
 import { useState } from 'react'
 import { router } from 'expo-router'
 import useAuthStore from '../../store/authStore'
+import { supabase } from '../../services/supabase'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 export default function NameScreen() {
   const [name, setName] = useState('')
-  const { updateName } = useAuthStore()
+  const [saving, setSaving] = useState(false)
+  const { user, updateName } = useAuthStore()
 
-  const handleContinue = () => {
-    if (name.trim()) {
+  const handleContinue = async () => {
+    if (!name.trim()) return
+    setSaving(true)
+    try {
+      // Save name to local store
       updateName(name.trim())
+
+      // Save name to backend users table
+      if (user?.id) {
+        const { error } = await supabase
+          .from('users')
+          .update({ name: name.trim(), updated_at: new Date().toISOString() })
+          .eq('id', user.id)
+
+        if (error) console.warn('Failed to save name:', error.message)
+      }
+
+      // Also save name to AsyncStorage user_data
+      try {
+        const userData = await AsyncStorage.getItem('user_data')
+        if (userData) {
+          const parsed = JSON.parse(userData)
+          parsed.name = name.trim()
+          await AsyncStorage.setItem('user_data', JSON.stringify(parsed))
+        }
+      } catch (storeErr) {
+        console.warn('Failed to update AsyncStorage user_data:', storeErr.message)
+      }
+
       router.replace('/(tabs)')
+    } catch (err) {
+      Alert.alert('Error', 'Failed to save profile. Please try again.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -33,11 +66,15 @@ export default function NameScreen() {
         />
 
         <TouchableOpacity
-          style={[styles.button, !name.trim() && styles.buttonDisabled]}
+          style={[styles.button, (!name.trim() || saving) && styles.buttonDisabled]}
           onPress={handleContinue}
-          disabled={!name.trim()}
+          disabled={!name.trim() || saving}
         >
-          <Text style={styles.buttonText}>Continue</Text>
+          {saving ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <Text style={styles.buttonText}>Continue</Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
