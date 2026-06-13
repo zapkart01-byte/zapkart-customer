@@ -1,14 +1,31 @@
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert
 } from 'react-native'
-import { router } from 'expo-router'
+import { useState, useCallback } from 'react'
+import { router, useFocusEffect } from 'expo-router'
+import { getAddresses, deleteAddress } from '../services/addressService'
 
 export default function AddressesScreen() {
-  // Placeholder for future address management
-  const savedAddresses = []
+  const [addresses, setAddresses] = useState([])
 
-  const handleAddAddress = () => {
-    Alert.alert('Coming Soon', 'Address management will be available in the next update')
+  useFocusEffect(
+    useCallback(() => {
+      getAddresses().then(setAddresses).catch(() => setAddresses([]))
+    }, [])
+  )
+
+  const handleDelete = (id) => {
+    Alert.alert('Delete Address', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const result = await deleteAddress(id)
+          if (result.success) setAddresses(result.addresses)
+        }
+      }
+    ])
   }
 
   return (
@@ -19,34 +36,34 @@ export default function AddressesScreen() {
           <Text style={styles.backArrow}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Saved Addresses</Text>
-        <TouchableOpacity onPress={handleAddAddress}>
+        <TouchableOpacity onPress={() => router.push('/address/add')}>
           <Text style={styles.addButton}>+</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        {savedAddresses.length === 0 ? (
+        {addresses.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>📍</Text>
             <Text style={styles.emptyTitle}>No Saved Addresses</Text>
             <Text style={styles.emptyText}>
               You can save your delivery addresses for faster checkout
             </Text>
-            <TouchableOpacity style={styles.emptyButton} onPress={handleAddAddress}>
+            <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/address/add')}>
               <Text style={styles.emptyButtonText}>Add Address</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          savedAddresses.map((address, index) => (
-            <View key={index} style={styles.addressCard}>
+          addresses.map((address, index) => (
+            <View key={address.id || index} style={styles.addressCard}>
               <View style={styles.addressHeader}>
-                <Text style={styles.addressType}>{address.type}</Text>
-                <TouchableOpacity>
-                  <Text style={styles.editText}>Edit</Text>
+                <Text style={styles.addressType}>{address.type || 'Home'}</Text>
+                <TouchableOpacity onPress={() => handleDelete(address.id)}>
+                  <Text style={styles.editText}>Delete</Text>
                 </TouchableOpacity>
               </View>
-              <Text style={styles.addressText}>{address.fullAddress}</Text>
-              <Text style={styles.addressPhone}>{address.phone}</Text>
+              <Text style={styles.addressText}>{address.fullAddress || address.streetArea}</Text>
+              {address.phone ? <Text style={styles.addressPhone}>{address.phone}</Text> : null}
             </View>
           ))
         )}

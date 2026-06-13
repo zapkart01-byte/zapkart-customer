@@ -221,13 +221,6 @@ export async function logout() {
     await AsyncStorage.removeItem('user_data')
     await AsyncStorage.removeItem('cart-storage')
     await AsyncStorage.removeItem('auth-storage')
-    
-    try {
-      const useAuthStore = require('../store/authStore').default
-      useAuthStore.getState().clearUser()
-    } catch (storeError) {
-      // Ignored
-    }
     return { success: true }
   } catch (error) {
     console.error('Logout error:', error)
