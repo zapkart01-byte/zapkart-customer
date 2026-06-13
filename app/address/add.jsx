@@ -163,8 +163,10 @@ export default function AddAddressScreen() {
             </View>
           </View>
           <Text style={styles.mapTip}>Drag the map to position the pin exactly</Text>
-          
-          {/* Floating Use Current Location Button */}
+        </View>
+
+        {/* Floating Use Current Location Button (outside map container to avoid native map overlay) */}
+        <View style={styles.locationBtnWrapper}>
           <TouchableOpacity 
             style={styles.locationFloatingBtn} 
             onPress={getCurrentLocation}
@@ -358,10 +360,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 6,
   },
+  locationBtnWrapper: {
+    alignItems: 'flex-end',
+    marginTop: -44,
+    marginRight: 12,
+    marginBottom: 12,
+    zIndex: 10,
+  },
   locationFloatingBtn: {
-    position: 'absolute',
-    right: 12,
-    bottom: 44,
     backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
@@ -374,6 +380,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
   },
   locationFloatingBtnText: {
     color: '#FF6B00',
